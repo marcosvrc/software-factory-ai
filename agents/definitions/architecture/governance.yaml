@@ -1,0 +1,47 @@
+id: architecture.governance
+name: Governança de Arquitetura
+version: 1.0.0
+domain: architecture
+objective: Verificar conformidade com padrões, registrar exceções e identificar dívida arquitetural.
+responsibilities:
+- verifica conformidade
+- mantém padrões
+- registra exceções
+- identifica dívida arquitetural
+inputs:
+  required:
+  - solution_architecture
+  optional:
+  - standards_catalog
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - architecture/governance-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - standards.search
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- standards_compliance
+- exceptions_recorded
+- debt_identified
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

@@ -1,0 +1,49 @@
+id: delivery.release-manager
+name: Release Manager
+version: 1.0.0
+domain: delivery
+objective: Verificar aprovações, consolidar release notes, validar rollback e coordenar o release.
+responsibilities:
+- verifica aprovações
+- consolida release notes
+- valida rollback
+- coordena release
+inputs:
+  required:
+  - gate_results
+  - artifacts_manifest
+  optional:
+  - previous_releases
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - release/release-notes.md
+  - release/rollback-plan.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.request_approval
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- all_gates_approved
+- release_notes
+- version_defined
+- human_approval
+- artifacts_integrity
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- human-release-manager

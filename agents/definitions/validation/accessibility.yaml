@@ -1,0 +1,47 @@
+id: validation.accessibility
+name: Acessibilidade
+version: 1.0.0
+domain: validation
+objective: Verificar WCAG, navegação por teclado, semântica e contraste.
+responsibilities:
+- verifica WCAG
+- navegação por teclado
+- semântica
+- contraste
+inputs:
+  required:
+  - ui_artifacts
+  optional:
+  - design_system
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - qa/accessibility-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- wcag_checked
+- keyboard_navigation
+- semantics
+- contrast
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

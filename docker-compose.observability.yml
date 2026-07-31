@@ -1,0 +1,38 @@
+# Extensao opcional de observabilidade: Langfuse (traces de LLM).
+# Conforme secao 22.1 da proposta, o Langfuse fica em composicao separada:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+services:
+  langfuse-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - factory-network
+
+  langfuse:
+    image: langfuse/langfuse:2
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: local-development-secret
+      NEXTAUTH_URL: http://localhost:3002
+      SALT: local-development-salt
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "3002:3000"
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    networks:
+      - factory-network
+
+volumes:
+  langfuse-db-data:

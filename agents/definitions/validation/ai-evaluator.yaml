@@ -1,0 +1,48 @@
+id: validation.ai-evaluator
+name: Avaliação de IA
+version: 1.0.0
+domain: validation
+objective: 'Quando o projeto usar IA: criar datasets de avaliação, medir qualidade, verificar regressão
+  e avaliar alucinação e segurança.'
+responsibilities:
+- cria datasets de avaliação
+- mede qualidade
+- verifica regressão
+- avalia alucinação e segurança
+inputs:
+  required:
+  - ai_components
+  optional:
+  - previous_evals
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - qa/ai-eval-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - test.run_integration
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- eval_dataset_created
+- quality_measured
+- hallucination_assessed
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

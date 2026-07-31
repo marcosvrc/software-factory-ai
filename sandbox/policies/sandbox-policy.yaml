@@ -1,0 +1,23 @@
+# Política do sandbox (seções 16.2 e 16.4)
+constraints:
+  user: "1000:1000"          # usuário não root
+  read_only_root_fs: true    # filesystem somente leitura, exceto workspace
+  network: none              # rede desabilitada por padrão
+  cpu_limit: 1.0
+  memory_limit: 1g
+  timeout_seconds: 300
+  docker_socket: forbidden
+  secrets: forbidden
+  dedicated_volume: true
+
+allowed_images:
+  - factory-sandbox-python:latest
+
+forbidden:
+  - privileged
+  - mount_root
+  - mount_docker_socket
+  - run_as_root
+  - unrestricted_internet
+  - host_directory_read
+  - scripts_without_timeout

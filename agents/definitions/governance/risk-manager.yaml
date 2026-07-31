@@ -1,0 +1,46 @@
+id: governance.risk-manager
+name: Gestor de Riscos
+version: 1.0.0
+domain: governance
+objective: Manter o registro de riscos, classificar probabilidade e impacto, acompanhar mitigações e escalar
+  riscos críticos.
+responsibilities:
+- mantém registro de riscos
+- classifica probabilidade e impacto
+- acompanha mitigações
+- escala riscos críticos
+inputs:
+  required:
+  - risk_register
+  optional:
+  - incident_history
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - governance/risk-register.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- risks_registered
+- probability_impact_classified
+- mitigations_tracked
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- human-risk-owner

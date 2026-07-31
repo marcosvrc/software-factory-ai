@@ -1,0 +1,48 @@
+id: architecture.security
+name: Arquiteto de Segurança
+version: 1.0.0
+domain: architecture
+objective: Definir trust boundaries, criar threat model, definir controles e avaliar riscos arquiteturais.
+responsibilities:
+- define trust boundaries
+- cria threat model
+- define controles
+- avalia riscos arquiteturais
+inputs:
+  required:
+  - solution_architecture
+  optional:
+  - risk_register
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - architecture/threat-model.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - diagram.generate
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- trust_boundaries
+- threat_model
+- controls_defined
+- risks_assessed
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- security-architect
+- human-architect

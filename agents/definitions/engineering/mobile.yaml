@@ -1,0 +1,49 @@
+id: engineering.mobile
+name: Desenvolvedor Mobile
+version: 1.0.0
+domain: engineering
+objective: Implementar aplicações móveis quando aplicável, gerenciando permissões, armazenamento local
+  e notificações.
+responsibilities:
+- implementa aplicações móveis quando aplicável
+- gerencia permissões
+- armazenamento local
+- notificações
+inputs:
+  required:
+  - technical_backlog
+  optional:
+  - platform_guidelines
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - code/mobile-patch.diff
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - code.search
+  - code.patch
+  - test.run_unit
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.1
+  max_context_tokens: 32000
+quality_gates:
+- build_success
+- permissions_reviewed
+- tests_passed
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

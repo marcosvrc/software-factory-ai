@@ -1,0 +1,46 @@
+id: delivery.incident-manager
+name: Incident Manager
+version: 1.0.0
+domain: delivery
+objective: Coordenar incidentes, classificar severidade, manter timeline e comunicar status.
+responsibilities:
+- coordena incidentes
+- classifica severidade
+- mantém timeline
+- comunica status
+inputs:
+  required:
+  - incident_report
+  optional:
+  - runbooks
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/incident-timeline.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- severity_classified
+- timeline_maintained
+- status_communicated
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArchitectureProposal",
+  "type": "object",
+  "required": ["summary", "components", "quality_attributes"],
+  "properties": {
+    "summary": {"type": "string"},
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "responsibility"],
+        "properties": {
+          "name": {"type": "string"},
+          "responsibility": {"type": "string"},
+          "dependencies": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "quality_attributes": {"type": "array", "items": {"type": "string"}},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "adrs": {"type": "array", "items": {"type": "string"}}
+  }
+}

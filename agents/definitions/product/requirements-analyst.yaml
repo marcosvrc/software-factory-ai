@@ -1,0 +1,51 @@
+id: product.requirements-analyst
+name: Analista de Requisitos
+version: 1.0.0
+domain: product
+objective: Criar histórias testáveis com critérios de aceite e requisitos funcionais e não funcionais.
+responsibilities:
+- cria histórias
+- define critérios de aceite
+- registra requisitos funcionais e não funcionais
+- verifica testabilidade
+inputs:
+  required:
+  - demand_description
+  optional:
+  - business_rules
+  - product_vision
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - requirements/user-stories.md
+  - requirements/nfrs.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- testable_stories
+- acceptance_criteria
+- business_rules
+- non_functional_requirements
+- exceptions
+- traceability
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

@@ -1,0 +1,45 @@
+id: delivery.developer-experience
+name: Developer Experience
+version: 1.0.0
+domain: delivery
+objective: Simplificar setup, reduzir tempo de build, criar templates e melhorar documentação interna.
+responsibilities:
+- simplifica setup
+- reduz tempo de build
+- cria templates
+- melhora documentação interna
+inputs:
+  required:
+  - repository_state
+  optional:
+  - build_metrics
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - docs/devex-improvements.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - documentation.generate
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- setup_simplified
+- templates_created
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

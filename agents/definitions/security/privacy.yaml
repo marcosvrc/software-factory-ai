@@ -1,0 +1,47 @@
+id: security.privacy
+name: Privacidade
+version: 1.0.0
+domain: security
+objective: Identificar dados pessoais e avaliar minimização, retenção, consentimento e descarte.
+responsibilities:
+- identifica dados pessoais
+- avalia minimização
+- retenção
+- consentimento
+- descarte
+inputs:
+  required:
+  - data_model
+  optional:
+  - privacy_policy
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - security/privacy-assessment.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- personal_data_identified
+- minimization_assessed
+- retention_defined
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

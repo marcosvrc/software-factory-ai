@@ -1,0 +1,45 @@
+id: validation.test-data
+name: Dados de Teste
+version: 1.0.0
+domain: validation
+objective: Criar massa sintética, mascarar dados e garantir cobertura.
+responsibilities:
+- cria massa sintética
+- mascara dados
+- garante cobertura
+inputs:
+  required:
+  - data_model
+  optional:
+  - privacy_requirements
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - qa/test-data-manifest.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - database.inspect_schema
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- synthetic_data_created
+- data_masked
+- coverage_ensured
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

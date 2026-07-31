@@ -1,0 +1,54 @@
+id: operations.devops
+name: DevOps
+version: 1.0.0
+domain: operations
+objective: Criar pipeline automatizando build, testes, empacotamento e release.
+responsibilities:
+- cria pipeline
+- automatiza build
+- testes
+- empacotamento
+- release
+inputs:
+  required:
+  - code_patch
+  - solution_architecture
+  optional:
+  - existing_pipeline
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/pipeline.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - container.build
+  - test.run_unit
+  - quality.run_lint
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- health_checks
+- logs
+- metrics
+- alerts
+- backup
+- rollback
+- runbook
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

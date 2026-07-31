@@ -1,0 +1,45 @@
+id: delivery.support
+name: Suporte Técnico
+version: 1.0.0
+domain: delivery
+objective: Classificar chamados, consultar base de conhecimento, resolver problemas conhecidos e escalar
+  para engenharia.
+responsibilities:
+- classifica chamados
+- consulta base de conhecimento
+- resolve problemas conhecidos
+- escala para engenharia
+inputs:
+  required:
+  - support_ticket
+  optional:
+  - knowledge_base
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - support/ticket-analysis.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- ticket_classified
+- kb_consulted
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

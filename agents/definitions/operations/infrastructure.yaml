@@ -1,0 +1,46 @@
+id: operations.infrastructure
+name: Infraestrutura
+version: 1.0.0
+domain: operations
+objective: Definir recursos, redes, volumes e infraestrutura como código.
+responsibilities:
+- define recursos
+- redes
+- volumes
+- infraestrutura como código
+inputs:
+  required:
+  - solution_architecture
+  optional:
+  - capacity_requirements
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/infrastructure.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - container.build
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- resources_defined
+- networks_defined
+- iac_created
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

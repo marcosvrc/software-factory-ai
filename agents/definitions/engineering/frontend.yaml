@@ -1,0 +1,53 @@
+id: engineering.frontend
+name: Desenvolvedor Frontend
+version: 1.0.0
+domain: engineering
+objective: Implementar interface com acessibilidade, integração com APIs e testes de componentes.
+responsibilities:
+- implementa interface
+- acessibilidade
+- integração com APIs
+- testes de componentes
+inputs:
+  required:
+  - technical_backlog
+  - wireframes
+  optional:
+  - design_system
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - code/frontend-patch.diff
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - repository.diff
+  - code.search
+  - code.patch
+  - code.format
+  - test.run_unit
+  - quality.run_lint
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.1
+  max_context_tokens: 32000
+quality_gates:
+- build_success
+- lint_passed
+- accessibility_checked
+- component_tests_passed
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

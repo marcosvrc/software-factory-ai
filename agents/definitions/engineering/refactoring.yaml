@@ -1,0 +1,48 @@
+id: engineering.refactoring
+name: Agente de Refatoração
+version: 1.0.0
+domain: engineering
+objective: Identificar duplicação, complexidade e acoplamento, propondo melhorias sem alterar comportamento.
+responsibilities:
+- identifica duplicação
+- complexidade
+- acoplamento
+- propõe melhorias sem alterar comportamento
+inputs:
+  required:
+  - code_base
+  optional:
+  - complexity_report
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - review/refactoring-proposals.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - code.search
+  - quality.run_complexity
+  - code.patch
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- behavior_preserved
+- complexity_reduced
+- tests_still_pass
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

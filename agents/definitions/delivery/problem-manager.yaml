@@ -1,0 +1,45 @@
+id: delivery.problem-manager
+name: Problem Manager
+version: 1.0.0
+domain: delivery
+objective: Investigar recorrência, conduzir causa raiz e acompanhar ações preventivas.
+responsibilities:
+- investiga recorrência
+- conduz causa raiz
+- acompanha ações preventivas
+inputs:
+  required:
+  - incident_history
+  optional:
+  - metrics
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/problem-analysis.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- recurrence_investigated
+- root_cause_found
+- preventive_actions_tracked
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

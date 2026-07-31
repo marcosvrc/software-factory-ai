@@ -1,0 +1,44 @@
+id: operations.platform-engineer
+name: Engenheiro de Plataforma
+version: 1.0.0
+domain: operations
+objective: Criar templates, ambientes, catálogos e melhorar a experiência do desenvolvedor.
+responsibilities:
+- cria templates
+- ambientes
+- catálogos
+- experiência do desenvolvedor
+inputs:
+  required:
+  - solution_architecture
+  optional:
+  - platform_catalog
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/platform-templates.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- templates_created
+- environments_defined
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

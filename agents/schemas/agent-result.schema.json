@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentResult",
+  "type": "object",
+  "required": ["agent_id", "execution_id", "status", "summary"],
+  "properties": {
+    "agent_id": {"type": "string"},
+    "execution_id": {"type": "string"},
+    "status": {"enum": ["approved", "changes_requested", "blocked", "failed"]},
+    "summary": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description", "evidence", "recommendation"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"enum": ["info", "low", "medium", "high", "critical"]},
+          "category": {"type": "string"},
+          "description": {"type": "string"},
+          "evidence": {"type": "array", "items": {"type": "string"}},
+          "recommendation": {"type": "string"}
+        }
+      }
+    },
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "next_recommended_agents": {"type": "array", "items": {"type": "string"}}
+  }
+}

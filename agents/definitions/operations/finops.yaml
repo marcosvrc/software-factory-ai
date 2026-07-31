@@ -1,0 +1,45 @@
+id: operations.finops
+name: FinOps
+version: 1.0.0
+domain: operations
+objective: Estimar consumo, custo de inferência e custo por execução, propondo otimizações.
+responsibilities:
+- estima consumo
+- custo de inferência
+- custo por execução
+- otimização
+inputs:
+  required:
+  - usage_metrics
+  optional:
+  - pricing_catalog
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/finops-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- consumption_estimated
+- costs_estimated
+- optimizations_proposed
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

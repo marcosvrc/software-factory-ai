@@ -1,0 +1,48 @@
+id: security.appsec
+name: AppSec
+version: 1.0.0
+domain: security
+objective: Executar SAST, revisar autenticação, identificar vulnerabilidades e acompanhar correções.
+responsibilities:
+- executa SAST
+- revisa autenticação
+- identifica vulnerabilidades
+- acompanha correções
+inputs:
+  required:
+  - code_patch
+  optional:
+  - threat_model
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - security/appsec-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - security.run_sast
+  - security.scan_secrets
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- sast_passed
+- dependencies_evaluated
+- no_open_critical_risk
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- security-architect
+- human-security

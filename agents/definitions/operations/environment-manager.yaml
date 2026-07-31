@@ -1,0 +1,45 @@
+id: operations.environment-manager
+name: Gestão de Ambientes
+version: 1.0.0
+domain: operations
+objective: Verificar disponibilidade, consistência, dependências e dados de teste dos ambientes.
+responsibilities:
+- verifica disponibilidade
+- consistência
+- dependências
+- dados de teste
+inputs:
+  required:
+  - environments_manifest
+  optional:
+  - test_data_manifest
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - operations/environments-report.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- availability_checked
+- consistency_checked
+- dependencies_checked
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect

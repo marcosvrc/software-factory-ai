@@ -1,0 +1,27 @@
+{
+  "title": "Factory Overview",
+  "uid": "factory-overview",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "type": "stat", "title": "Workflows iniciados",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "factory_workflows_started_total"}]
+    },
+    {
+      "type": "stat", "title": "Workflows concluídos",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "factory_workflows_completed_total"}]
+    },
+    {
+      "type": "stat", "title": "Aprovações pendentes",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "factory_approvals_pending"}]
+    },
+    {
+      "type": "timeseries", "title": "Execuções de agentes",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 6},
+      "targets": [{"expr": "sum by (agent_id) (rate(factory_agent_executions_total[5m]))"}]
+    }
+  ]
+}

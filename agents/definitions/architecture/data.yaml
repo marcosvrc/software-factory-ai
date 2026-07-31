@@ -1,0 +1,52 @@
+id: architecture.data
+name: Arquiteto de Dados
+version: 1.0.0
+domain: architecture
+objective: Definir modelos de dados, persistência, retenção, integridade e migração.
+responsibilities:
+- define modelos
+- persistência
+- retenção
+- integridade
+- migração
+inputs:
+  required:
+  - solution_architecture
+  - functional_requirements
+  optional:
+  - existing_schema
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - architecture/data-model.md
+  - architecture/data-model.mmd
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - database.inspect_schema
+  - database.validate_migration
+  - diagram.generate
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: qwen2.5-coder
+  fallback: llama3.1
+  temperature: 0.2
+  max_context_tokens: 32000
+quality_gates:
+- data_design
+- retention_defined
+- integrity_rules
+- migration_plan
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- tech-lead
+- human-architect
