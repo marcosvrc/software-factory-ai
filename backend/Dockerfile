@@ -8,9 +8,10 @@ WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY shared/ shared/
-COPY backend/ backend/
+COPY --chown=factory:factory shared/ shared/
+COPY --chown=factory:factory backend/ backend/
 WORKDIR /app/backend
+ENV PYTHONPATH=/app:/app/backend
 
 USER factory
 EXPOSE 8000

@@ -8,10 +8,10 @@ WORKDIR /app
 COPY workers/requirements.txt ./worker-requirements.txt
 RUN pip install --no-cache-dir -r worker-requirements.txt
 
-COPY shared/ shared/
-COPY agents/ agents/
-COPY tools/ tools/
-COPY workers/ workers/
-COPY sandbox/ sandbox/
+COPY --chown=factory:factory shared/ shared/
+COPY --chown=factory:factory agents/ agents/
+COPY --chown=factory:factory tools/ tools/
+COPY --chown=factory:factory workers/ workers/
+COPY --chown=factory:factory sandbox/ sandbox/
 
 USER factory

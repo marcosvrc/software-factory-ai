@@ -8,10 +8,10 @@ WORKDIR /app
 COPY orchestrator/requirements.txt ./orchestrator-requirements.txt
 RUN pip install --no-cache-dir -r orchestrator-requirements.txt
 
-COPY shared/ shared/
-COPY agents/ agents/
-COPY tools/ tools/
-COPY orchestrator/ orchestrator/
+COPY --chown=factory:factory shared/ shared/
+COPY --chown=factory:factory agents/ agents/
+COPY --chown=factory:factory tools/ tools/
+COPY --chown=factory:factory orchestrator/ orchestrator/
 
 USER factory
 CMD ["python", "-m", "orchestrator.main"]
