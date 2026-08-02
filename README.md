@@ -14,6 +14,9 @@ Implementação da **Proposta de Arquitetura Local Multiagente para uma Fábrica
 - [Arquitetura](#arquitetura)
 - [Fluxo de trabalho](#fluxo-de-trabalho)
 - [Agentes](#agentes)
+- [Interface web](#interface-web)
+- [Configuração de agentes](#configuração-de-agentes)
+- [Servidores MCP](#servidores-mcp)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Pré-requisitos](#pré-requisitos)
 - [Como rodar](#como-rodar)
@@ -21,6 +24,7 @@ Implementação da **Proposta de Arquitetura Local Multiagente para uma Fábrica
 - [Endereços locais](#endereços-locais)
 - [Usuários padrão (seed)](#usuários-padrão-seed)
 - [Observabilidade](#observabilidade)
+- [Resiliência do orquestrador](#resiliência-do-orquestrador)
 - [Documentação adicional](#documentação-adicional)
 
 ## Visão geral
@@ -44,7 +48,7 @@ O fluxo **não é uma conversa livre entre agentes**. Ele é controlado por um o
 
 | Camada | Tecnologia | Diretório |
 |---|---|---|
-| Apresentação | Next.js 14 | `frontend/` |
+| Apresentação | Next.js 14 + Tailwind CSS + React Flow | `frontend/` |
 | API | FastAPI | `backend/` |
 | Orquestração | LangGraph | `orchestrator/` |
 | Execução dos agentes | Workers por domínio | `workers/` |
@@ -52,6 +56,7 @@ O fluxo **não é uma conversa livre entre agentes**. Ele é controlado por um o
 | Ferramentas dos agentes | Tools tipadas | `tools/` |
 | Sandbox de código | Containers efêmeros | `sandbox/` |
 | Contratos compartilhados | Pydantic / dataclasses | `shared/` |
+| Integração MCP | Cliente JSON-RPC + OAuth 2.1 | `shared/mcp/` |
 | Modelo de linguagem | Ollama (no host) | — |
 | Dados | PostgreSQL, Redis, RabbitMQ, MinIO, Git | — |
 | Observabilidade | OpenTelemetry, Prometheus, Grafana, Loki | `infrastructure/` |
@@ -64,14 +69,26 @@ mensagens do RabbitMQ e usam o Ollama local para inferência.
 ## Fluxo de trabalho
 
 ```
-Demanda → Triagem → Produto/Descoberta → Requisitos → [Aprovação de escopo] →
-Arquitetura → [Architecture gate] → Planejamento técnico → Desenvolvimento →
-Code review → Testes → QA funcional → Segurança → Validação operacional →
-Documentação/Release → [Aprovação humana] → Entrega
+Demanda → Triagem → Análise de intake → Produto/Descoberta → Requisitos →
+[Aprovação de escopo] → Arquitetura → [Architecture gate] → Planejamento técnico →
+Desenvolvimento → Code review → Testes → QA funcional → Segurança →
+Validação operacional → Documentação/Release → [Aprovação humana] → Entrega
 ```
 
+- **Análise de intake:** antes de gastar ciclos de produto e arquitetura, o agente
+  `product.intake-analyst` avalia se a demanda tem informação suficiente (canal de acesso,
+  escopo, volume esperado, regras de negócio essenciais, restrições não-funcionais, dados
+  sensíveis, integrações e critérios de sucesso). Diferente dos outros gates, quando falta
+  informação o fluxo **pergunta ao solicitante** em vez de tentar adivinhar: é criada uma
+  aprovação do tipo `intake_clarification` e a resposta dada no campo de justificativa é
+  reinjetada na próxima análise (`clarification_notes`).
 - **Máximo de 3 ciclos automáticos por gate.** Após a terceira tentativa falha, o item muda para
-  `HUMAN_REVIEW_REQUIRED` e aguarda intervenção humana.
+  `HUMAN_REVIEW_REQUIRED` e aguarda intervenção humana. Aprovar a revisão humana **zera os
+  contadores** e retoma a execução na etapa seguinte ao gate que escalou (nunca do zero, nem
+  pulando etapas).
+- **Findings são por etapa, não cumulativos.** Cada etapa substitui os seus próprios findings a
+  cada rodada. Sem isso, um problema já corrigido continuava sendo reapresentado ao modelo como
+  se fosse atual, prendendo a demanda em loop indefinido.
 - Os estados de projeto, execução (`run`) e tarefa (`task`) seguem máquinas de estado explícitas
   com transições validadas (`shared/contracts/states.py`). Transições fora da tabela permitida
   geram `InvalidTransitionError`.
@@ -89,12 +106,13 @@ definição especifica objetivo, responsabilidades, entradas/saídas, artefatos 
 permitidas/negadas, modelo de LLM (primário e fallback), gates de qualidade, política de retry e
 escalonamento.
 
-Os 52 agentes lógicos são agrupados em **8 workers físicos** por domínio:
+Os 54 agentes lógicos são agrupados em **8 workers físicos** por domínio:
 
 ### Product (`workers/product`)
 
 | Agente | Objetivo | Principais artefatos |
 |---|---|---|
+| Analista de Intake | Avalia se a demanda tem informação suficiente para iniciar o desenvolvimento e pergunta ao solicitante o que falta | `product/intake-checklist.md` |
 | Product Manager | Define visão de produto, valor esperado e métricas da demanda | `product/vision.md`, `product/metrics.md` |
 | Product Owner | Prioriza backlog, esclarece objetivos e valida aceite de negócio | `product/backlog-priorities.md` |
 | Analista de Negócios | Identifica regras de negócio, modela processos e mapeia atores | `product/business-rules.md`, `product/process-model.mmd` |
@@ -195,7 +213,80 @@ Os 52 agentes lógicos são agrupados em **8 workers físicos** por domínio:
 - **Escalonamento:** cada agente declara para quem escalar (ex.: `tech-lead`,
   `human-architect`, `human-security`) quando não consegue resolver.
 - **Saída padronizada:** todo agente retorna um `AgentResult` validado contra
-  `agents/schemas/agent-result.schema.json`.
+  `agents/schemas/agent-result.schema.json`. Quando produz código, preenche `code_files` com o
+  conteúdo completo dos arquivos — que é persistido no MinIO, registrado na tabela `artifacts` e
+  materializado em `workspaces/<project_id>/` para você abrir num editor normal.
+
+## Interface web
+
+| Tela | Rota | O que faz |
+|---|---|---|
+| Painel | `/` | Visão geral: projetos, aprovações pendentes, agentes habilitados |
+| Monitor | `/monitor` | Todas as execuções em tempo real (atualiza a cada 5s), com filtros e esteira de progresso |
+| Projetos | `/projects` | Cria projetos e demandas e dispara execuções |
+| Aprovações | `/approvals` | Decide aprovações humanas (escopo, release, esclarecimento de intake, revisão por limite de ciclos) |
+| Execução | `/runs/{id}` | Detalhe da execução: diagrama do processo, tarefas, artefatos (com download) e timeline |
+| Agentes | `/agents` | Habilita/desabilita agentes e configura objetivo, modelo, ferramentas e prompt |
+| MCP | `/mcp` | Cadastra servidores MCP, autoriza via OAuth e descobre as ferramentas expostas |
+
+O detalhe da execução traz um **diagrama do processo no estilo Camunda Cockpit** (React Flow),
+desenhando as 15 etapas e os caminhos reais do grafo — fluxo normal, ciclos de ajuste, escaladas
+para revisão humana e retomada — com o ponto atual da execução destacado e o contador de ciclos
+(`N/3`) em cada gate.
+
+## Configuração de agentes
+
+A configuração efetiva de cada agente vive no **banco** (tabela `agent_definitions`) e é o que o
+orquestrador e os workers realmente aplicam ao executar. Os YAMLs em `agents/definitions/` são a
+semente: na primeira sincronização eles populam a configuração e ficam guardados como
+`default_configuration`, usada pelo botão **Restaurar padrão**.
+
+Pela tela `/agents` (papel `FACTORY_MANAGER` ou superior) é possível:
+
+- **habilitar/desabilitar** um agente — desabilitado, ele é ignorado nas próximas execuções e a
+  etapa segue com os demais agentes (se todos estiverem desabilitados, a etapa é aprovada
+  automaticamente em vez de travar o fluxo);
+- editar **objetivo**, **responsabilidades** e **critérios de qualidade**;
+- trocar **modelo** primário/fallback, temperatura e janela de contexto;
+- ajustar **ferramentas** permitidas e negadas;
+- definir um **prompt próprio** por agente (em branco, usa o template base compartilhado). Os
+  placeholders disponíveis são `{agent_name}`, `{agent_version}`, `{objective}`,
+  `{responsibilities}`, `{input_manifest}`, `{constraints}`, `{allowed_tools}` e
+  `{quality_gates}`;
+- vincular **servidores MCP** ao agente.
+
+Mudanças valem para **novas** execuções, com janela de até ~10s de cache
+(`AGENT_CONFIG_CACHE_TTL_SECONDS`). Execuções em andamento seguem com a configuração que
+carregaram. Uma configuração inválida é rejeitada pela API; se ainda assim algo ficar
+inconsistente, o runtime volta para o YAML base em vez de derrubar o pipeline.
+
+## Servidores MCP
+
+A tela `/mcp` (papel `ADMIN`) cadastra servidores [MCP](https://modelcontextprotocol.io) e
+descobre as ferramentas que eles expõem. Dois transportes são suportados:
+
+- **stdio** — o servidor sobe como subprocesso (`npx`, `uvx`, `node`, `python3` estão disponíveis
+  na imagem da API). Credenciais vão em variáveis de ambiente.
+- **http** — MCP Streamable HTTP, com autenticação via header estático **ou OAuth 2.1**.
+
+Para servidores OAuth (como o MCP hospedado do Notion, que não aceita token estático), o botão
+**Autorizar** executa o fluxo completo: descoberta da Protected Resource Metadata (RFC 9728) e da
+metadata do authorization server (RFC 8414/OIDC), registro dinâmico de cliente (RFC 7591),
+authorization code com **PKCE S256** e o parâmetro `resource` (RFC 8707), e renovação automática
+do token quando expira.
+
+> **Segurança:** um servidor stdio é um comando arbitrário executado no container da API — quem
+> cadastra consegue, por definição, executar código ali. Por isso a criação exige papel `ADMIN`,
+> servidores **nascem desabilitados**, o subprocesso **não herda o ambiente do container** (recebe
+> apenas `PATH`/`HOME`/`LANG` e as variáveis declaradas) e valores de `env`/`headers`, tokens e
+> `client_secret` **nunca são devolvidos pela API** — só as chaves e o estado da autorização.
+
+Se você acessar a fábrica por um endereço diferente de `http://localhost:8000`, ajuste
+`MCP_OAUTH_REDIRECT_URI`: o redirect URI é registrado no provedor e precisa bater exatamente.
+
+**Estado atual:** os agentes ainda não invocam ferramentas MCP durante as execuções — esta fase
+cobre configuração, autorização e descoberta. A execução automática (loop de tool calling no
+runtime) é o próximo passo.
 
 ## Estrutura do repositório
 
@@ -206,11 +297,19 @@ Os 52 agentes lógicos são agrupados em **8 workers físicos** por domínio:
 │   ├── prompts/        #   prompt base compartilhado
 │   ├── runtime/        #   executor e client Ollama
 │   └── schemas/        #   JSON Schemas de validação de saída
+│   └── config_store.py #   configuração efetiva dos agentes (banco sobre YAML)
 ├── orchestrator/      # Grafos LangGraph, roteamento, checkpoints e estado
 ├── workers/           # 8 workers físicos (1 processo por domínio), consumindo RabbitMQ
-├── backend/           # API FastAPI (auth, projetos, runs, aprovações, artefatos)
-├── frontend/          # Next.js (projetos, runs, aprovações)
+├── backend/           # API FastAPI (auth, projetos, runs, aprovações, artefatos, agentes, MCP)
+│   └── migrations/     #   migrações Alembic
+├── frontend/          # Next.js: design system próprio + telas da fábrica
+│   └── src/
+│       ├── app/        #     rotas (painel, monitor, projetos, aprovações, agentes, mcp, runs)
+│       ├── components/ #     ui/ (design system), domain/ (pipeline, diagrama), layout/
+│       └── lib/        #     client da API, permissões, mapas de status
 ├── shared/            # Contratos (Pydantic/dataclasses), logging, utils compartilhados
+│   └── mcp/            #   cliente MCP (JSON-RPC stdio/HTTP) + OAuth 2.1
+├── workspaces/        # Código gerado pelos agentes (cópia local navegável; fora do Git)
 ├── tools/             # Ferramentas tipadas usadas pelos agentes (git, db, containers, etc.)
 ├── sandbox/           # Política e runner de execução sandboxed de código gerado
 ├── infrastructure/    # Configs de Grafana, Prometheus, Loki, OTel, RabbitMQ, MinIO
@@ -263,6 +362,10 @@ docker compose run --rm api python -m app.db.seed
 ```
 
 O seed cria os usuários padrão descritos em [Usuários padrão](#usuários-padrão-seed).
+
+> As migrações incluem o esquema inicial (`0001`), a configuração editável de agentes (`0002`) e
+> os servidores MCP com autorização OAuth (`0003`, `0004`). Ao atualizar um ambiente existente,
+> rode `alembic upgrade head` antes de subir a API.
 
 ### 4. Subir o restante do stack
 
@@ -363,6 +466,20 @@ Senhas iguais ao usuário, válidas **apenas para desenvolvimento local**.
 - **Tracing:** OpenTelemetry Collector, exportando para o backend configurado.
 - **Observabilidade de LLM:** Langfuse (opcional, via `docker-compose.observability.yml`),
   rastreando prompts, tokens e latência de cada chamada aos modelos Ollama.
+
+## Resiliência do orquestrador
+
+- **Checkpoints persistentes:** o estado do grafo é salvo no PostgreSQL
+  (`AsyncPostgresSaver`). Reiniciar o orquestrador não perde o progresso: a execução retoma do
+  último nó concluído, em vez de refazer o pipeline.
+- **Reconciliação automática:** na subida, execuções em `RUNNING`/`WAITING_HUMAN` sem atualização
+  há mais de 180s são detectadas e retomadas — cobre o caso de o processo morrer no meio de uma
+  etapa.
+- **Retomada correta após revisão humana:** aprovar uma revisão por limite de ciclos retoma na
+  etapa seguinte ao gate que escalou e zera os contadores de todos os gates.
+
+> Ressalva: um nó parado aguardando decisão humana refaz o próprio nó ao retomar (a espera é um
+> polling, não um estado suspenso). O trabalho já concluído das etapas anteriores é preservado.
 
 ## Documentação adicional
 

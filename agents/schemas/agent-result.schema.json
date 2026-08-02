@@ -24,6 +24,18 @@
       }
     },
     "artifacts": {"type": "array", "items": {"type": "string"}},
+    "code_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "content"],
+        "properties": {
+          "path": {"type": "string"},
+          "content": {"type": "string"},
+          "language": {"type": ["string", "null"]}
+        }
+      }
+    },
     "next_recommended_agents": {"type": "array", "items": {"type": "string"}}
   }
 }

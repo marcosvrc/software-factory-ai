@@ -84,6 +84,42 @@ async def record_agent_execution(
     return execution_id
 
 
+async def record_artifact(
+    *,
+    project_id: str | None,
+    workflow_run_id: str,
+    task_id: str,
+    type_: str,
+    name: str,
+    storage_key: str,
+    checksum: str | None,
+    created_by: str | None,
+) -> str:
+    """Registra um artefato de primeira classe (tabela `artifacts`), visível
+    na API (/runs/{id}/artifacts) e no frontend. Sem isso, artefatos ficam
+    só como objetos "soltos" no MinIO, sem rastreabilidade estruturada."""
+    artifacts = await table("artifacts")
+    artifact_id = new_id()
+    async with engine.begin() as conn:
+        await conn.execute(
+            insert(artifacts).values(
+                id=artifact_id,
+                project_id=project_id,
+                workflow_run_id=workflow_run_id,
+                task_id=task_id,
+                type=type_,
+                name=name,
+                storage_key=storage_key,
+                checksum=checksum,
+                version=1,
+                created_by=created_by,
+                created_at=now(),
+                updated_at=now(),
+            )
+        )
+    return artifact_id
+
+
 async def record_findings(task_id: str, execution_id: str, findings: list[dict]) -> None:
     if not findings:
         return

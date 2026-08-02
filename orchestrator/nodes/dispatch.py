@@ -47,6 +47,7 @@ async def dispatch_agent(
     stage: str,
     context: dict,
     priority: int = 5,
+    project_id: str | None = None,
 ) -> dict:
     """Cria a tarefa, publica o comando e aguarda o AgentResult."""
     agent_id = agent_definition["id"]
@@ -68,6 +69,7 @@ async def dispatch_agent(
     envelope = MessageEnvelope(
         correlation_id=correlation_id,
         workflow_run_id=workflow_run_id,
+        project_id=project_id,
         task_id=task_id,
         agent_id=agent_id,
         command="execute_agent",

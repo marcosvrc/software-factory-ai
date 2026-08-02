@@ -8,6 +8,7 @@ from agents.registry import AgentRegistry
 # Mapeamento etapa do fluxo -> agentes lógicos (fluxo da seção 9)
 STAGE_AGENTS: dict[str, list[str]] = {
     "triage": ["governance.flow-manager"],
+    "intake_analysis": ["product.intake-analyst"],
     "product_discovery": [
         "product.product-manager",
         "product.product-owner",

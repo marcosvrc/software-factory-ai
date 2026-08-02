@@ -58,8 +58,6 @@ services:
       MINIO_ENDPOINT: minio:9000
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,8 +77,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
+    volumes:
+      - ./workspaces:/workspaces
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -98,8 +97,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
+    volumes:
+      - ./workspaces:/workspaces
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -118,10 +118,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       SANDBOX_ENABLED: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
     volumes:
-      - workspaces:/workspaces
+      - ./workspaces:/workspaces
       - artifacts:/artifacts
     depends_on:
       rabbitmq:
@@ -140,10 +139,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
     volumes:
-      - workspaces:/workspaces:ro
+      - ./workspaces:/workspaces
       - artifacts:/artifacts
     depends_on:
       rabbitmq:
@@ -162,10 +160,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
     volumes:
-      - workspaces:/workspaces:ro
+      - ./workspaces:/workspaces
       - artifacts:/artifacts
     depends_on:
       rabbitmq:
@@ -184,10 +181,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
     volumes:
-      - workspaces:/workspaces:ro
+      - ./workspaces:/workspaces
       - artifacts:/artifacts
     depends_on:
       rabbitmq:
@@ -206,10 +202,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
     volumes:
-      - workspaces:/workspaces:ro
+      - ./workspaces:/workspaces
       - artifacts:/artifacts
     depends_on:
       rabbitmq:
@@ -228,8 +223,9 @@ services:
       RABBITMQ_URL: amqp://factory:factory@rabbitmq:5672/
       DATABASE_URL: postgresql+asyncpg://factory:factory@postgres:5432/factory
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      WORKSPACES_ROOT: /workspaces
+    volumes:
+      - ./workspaces:/workspaces
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -360,5 +356,4 @@ volumes:
   prometheus-data:
   loki-data:
   grafana-data:
-  workspaces:
   artifacts:

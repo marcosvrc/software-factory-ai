@@ -2,7 +2,8 @@
 
 Usa SQLAlchemy Core sobre as tabelas criadas pelas migrations do backend.
 """
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from sqlalchemy import MetaData, Table, insert, select, update
@@ -148,6 +149,21 @@ async def get_approval_status(approval_id: str) -> str | None:
     return row[0] if row else None
 
 
+async def get_approval_rationale(approval_id: str) -> str | None:
+    """Retorna a justificativa registrada na decisão humana. Usada pelo gate
+    de intake_analysis (orchestrator/nodes/approvals.intake_clarification)
+    para capturar as respostas do solicitante às perguntas de esclarecimento
+    e realimentá-las na próxima tentativa de análise."""
+    approvals = await table("approvals")
+    async with engine.connect() as conn:
+        row = (
+            await conn.execute(
+                select(approvals.c.rationale).where(approvals.c.id == approval_id)
+            )
+        ).first()
+    return row[0] if row else None
+
+
 async def record_decision(
     *, workflow_run_id: str, decision_type: str, rationale: str, selected_option: str,
     options_considered: list | None = None, decided_by: str = "orchestrator",
@@ -200,7 +216,70 @@ async def fetch_queued_runs() -> list[dict]:
     ]
 
 
+# Runs em RUNNING ou WAITING_HUMAN sem atualização por mais que isso são
+# consideradas órfãs (processo do orchestrator caiu ou perdeu a conexão com
+# o banco no meio da execução, OU a tarefa local que fazia polling de uma
+# aprovação humana (orchestrator/nodes/approvals._wait_for_approval) morreu
+# junto com o processo — ver orchestrator/main.py
+# _reconcile_stale_running_runs). O valor é maior que o intervalo de polling
+# (5s) e maior que a duração típica de uma etapa (múltiplos agentes em
+# paralelo, ~30s cada), para não roubar runs que só estão demoradas numa
+# etapa longa: enquanto o processo original está vivo, `_running` no main.py
+# já protege contra reprocessamento duplicado; isso só age quando o processo
+# de fato reiniciou.
+STALE_RUNNING_THRESHOLD_SECONDS = int(os.getenv("STALE_RUNNING_THRESHOLD_SECONDS", "180"))
+
+# Status em que uma run pode ficar órfã: RUNNING (grafo processando etapas)
+# ou WAITING_HUMAN (aguardando decisão de aprovação — a tarefa local que
+# faz o polling dessa decisão também é perdida quando o processo reinicia).
+_RESUMABLE_STATUSES = ("RUNNING", "WAITING_HUMAN")
+
+
+async def fetch_stale_running_runs() -> list[dict]:
+    runs = await table("workflow_runs")
+    demands = await table("demands")
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                select(
+                    runs.c.id,
+                    runs.c.project_id,
+                    runs.c.demand_id,
+                    runs.c.correlation_id,
+                    demands.c.title,
+                    demands.c.description,
+                )
+                .join(demands, demands.c.id == runs.c.demand_id)
+                .where(
+                    runs.c.status.in_(_RESUMABLE_STATUSES),
+                    runs.c.updated_at
+                    < now() - timedelta(seconds=STALE_RUNNING_THRESHOLD_SECONDS),
+                )
+            )
+        ).all()
+    return [
+        {
+            "workflow_run_id": r[0],
+            "project_id": r[1],
+            "demand_id": r[2],
+            "correlation_id": r[3],
+            "demand_title": r[4],
+            "demand_description": r[5] or "",
+        }
+        for r in rows
+    ]
+
+
 async def sync_agent_definitions(definitions: list[dict]) -> None:
+    """Publica no banco as definições vindas dos YAMLs de agents/definitions.
+
+    IMPORTANTE: a coluna `configuration` NUNCA é sobrescrita para agentes que
+    já existem. Ela é a configuração efetiva, editável pelo usuário na tela de
+    configuração de agentes; antes desta versão o sync a sobrescrevia a cada
+    restart do orquestrador, apagando silenciosamente qualquer customização.
+    O YAML é gravado apenas em `default_configuration` (usado para restaurar o
+    padrão) e `stages`/metadados descritivos são atualizados normalmente.
+    """
     agents = await table("agent_definitions")
     async with engine.begin() as conn:
         existing = {row[0] for row in (await conn.execute(select(agents.c.id))).all()}
@@ -213,7 +292,8 @@ async def sync_agent_definitions(definitions: list[dict]) -> None:
                         name=d["name"],
                         version=d["version"],
                         domain=d["domain"],
-                        configuration=d["configuration"],
+                        default_configuration=d["configuration"],
+                        stages=d.get("stages", []),
                         updated_at=now(),
                     )
                 )
@@ -225,6 +305,8 @@ async def sync_agent_definitions(definitions: list[dict]) -> None:
                         version=d["version"],
                         domain=d["domain"],
                         configuration=d["configuration"],
+                        default_configuration=d["configuration"],
+                        stages=d.get("stages", []),
                         enabled=True,
                         created_at=now(),
                         updated_at=now(),

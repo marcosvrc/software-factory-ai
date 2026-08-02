@@ -90,6 +90,17 @@ class Task(TimestampMixin, Base):
 
 
 class AgentDefinition(TimestampMixin, Base):
+    """Definição efetiva do agente (fonte de verdade em execução).
+
+    `configuration` é editável pelo usuário (tela de configuração de agentes)
+    e é o que orquestrador/workers realmente aplicam ao executar — ver
+    agents/config_store.py. `default_configuration` guarda o snapshot do YAML
+    em agents/definitions/, usado para restaurar o padrão sem depender dos
+    arquivos em disco. `stages` lista as etapas do pipeline em que o agente
+    participa (publicado pelo orquestrador a partir de STAGE_AGENTS); é
+    informativo/read-only para a UI.
+    """
+
     __tablename__ = "agent_definitions"
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -97,7 +108,54 @@ class AgentDefinition(TimestampMixin, Base):
     version: Mapped[str] = mapped_column(String(32), default="1.0.0")
     domain: Mapped[str] = mapped_column(String(64), nullable=False)
     configuration: Mapped[dict] = mapped_column(JSON, default=dict)
+    default_configuration: Mapped[dict] = mapped_column(JSON, default=dict)
+    stages: Mapped[list] = mapped_column(JSON, default=list)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class McpServer(TimestampMixin, Base):
+    """Servidor MCP (Model Context Protocol) disponível para os agentes.
+
+    `transport` é "stdio" (comando local, ex.: uvx) ou "http" (endpoint
+    Streamable HTTP). `env`/`headers` podem conter credenciais e por isso NUNCA
+    são devolvidos em texto claro pela API (ver backend/app/api/v1/mcp.py).
+    `tools`, `last_status`, `last_error` e `last_checked_at` são o resultado da
+    última descoberta (`tools/list`), usados pela tela de configuração.
+    """
+
+    __tablename__ = "mcp_servers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    transport: Mapped[str] = mapped_column(String(16), default="stdio", nullable=False)
+    command: Mapped[str | None] = mapped_column(String(512))
+    args: Mapped[list] = mapped_column(JSON, default=list)
+    env: Mapped[dict] = mapped_column(JSON, default=dict)
+    url: Mapped[str | None] = mapped_column(String(1024))
+    headers: Mapped[dict] = mapped_column(JSON, default=dict)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=30)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    tools: Mapped[list] = mapped_column(JSON, default=list)
+    last_status: Mapped[str | None] = mapped_column(String(32))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # --- OAuth 2.1 (servidores remotos que exigem autorização) ---
+    # Metadata descoberta (endpoints do authorization server) e credenciais do
+    # cliente obtidas via Dynamic Client Registration. Tokens e client_secret
+    # são segredos: nunca são devolvidos pela API (ver api/v1/mcp.py).
+    oauth_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    oauth_client_id: Mapped[str | None] = mapped_column(String(512))
+    oauth_client_secret: Mapped[str | None] = mapped_column(String(1024))
+    oauth_scope: Mapped[str | None] = mapped_column(String(1024))
+    oauth_resource: Mapped[str | None] = mapped_column(String(1024))
+    oauth_access_token: Mapped[str | None] = mapped_column(Text)
+    oauth_refresh_token: Mapped[str | None] = mapped_column(Text)
+    oauth_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Autorização em andamento (PKCE): state e verifier da tentativa atual.
+    oauth_state: Mapped[str | None] = mapped_column(String(128), index=True)
+    oauth_code_verifier: Mapped[str | None] = mapped_column(String(256))
 
 
 class AgentExecution(TimestampMixin, Base):

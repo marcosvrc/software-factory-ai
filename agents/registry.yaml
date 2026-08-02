@@ -1,4 +1,8 @@
 agents:
+- id: product.intake-analyst
+  worker: product
+  enabled: true
+  config: agents/definitions/product/intake-analyst.yaml
 - id: product.product-manager
   worker: product
   enabled: true

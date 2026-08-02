@@ -20,20 +20,50 @@ logger = get_logger("agents.executor")
 
 BASE_PROMPT = (Path(__file__).parent.parent / "prompts" / "base.txt").read_text(encoding="utf-8")
 
+# Placeholders suportados no template de prompt (base ou customizado por
+# agente). São substituídos literalmente, NÃO via str.format(): um prompt
+# escrito pelo usuário costuma conter chaves em exemplos de JSON
+# ({"path": "..."}) e com str.format() isso levantaria KeyError, derrubando
+# TODA execução do agente (regressão real, ver agents/test_prompt_base.py).
+PROMPT_PLACEHOLDERS = (
+    "agent_name",
+    "agent_version",
+    "objective",
+    "responsibilities",
+    "input_manifest",
+    "constraints",
+    "allowed_tools",
+    "quality_gates",
+)
+
+
+def render_prompt(template: str, values: dict[str, str]) -> str:
+    """Substitui os placeholders conhecidos sem interpretar outras chaves."""
+    rendered = template
+    for key in PROMPT_PLACEHOLDERS:
+        rendered = rendered.replace("{" + key + "}", values.get(key, ""))
+    return rendered
+
 
 def build_system_prompt(definition: dict, context: dict) -> str:
     responsibilities = definition.get("responsibilities", [])
     constraints = context.get("constraints", []) + definition.get("constraints", [])
-    return BASE_PROMPT.format(
-        agent_name=definition["name"],
-        agent_version=definition["version"],
-        objective=definition["objective"].strip(),
-        responsibilities="\n".join(f"- {r}" for r in responsibilities) or "- conforme objetivo",
-        input_manifest=json.dumps(definition["inputs"], ensure_ascii=False, indent=2),
-        constraints="\n".join(f"- {c}" for c in constraints) or "- nenhuma adicional",
-        allowed_tools="\n".join(f"- {t}" for t in definition["tools"]["allowed"]) or "- nenhuma",
-        quality_gates="\n".join(f"- {g}" for g in definition["quality_gates"]),
-    )
+    values = {
+        "agent_name": definition["name"],
+        "agent_version": definition["version"],
+        "objective": (definition.get("objective") or "").strip(),
+        "responsibilities": "\n".join(f"- {r}" for r in responsibilities)
+        or "- conforme objetivo",
+        "input_manifest": json.dumps(definition["inputs"], ensure_ascii=False, indent=2),
+        "constraints": "\n".join(f"- {c}" for c in constraints) or "- nenhuma adicional",
+        "allowed_tools": "\n".join(f"- {t}" for t in definition["tools"]["allowed"])
+        or "- nenhuma",
+        "quality_gates": "\n".join(f"- {g}" for g in definition.get("quality_gates", [])),
+    }
+    # Prompt customizado por agente (tela de configuração de agentes). Quando
+    # ausente/vazio, usa o template base compartilhado.
+    custom = (definition.get("prompt_template") or "").strip()
+    return render_prompt(custom or BASE_PROMPT, values)
 
 
 def build_user_prompt(context: dict, execution_id: str, agent_id: str) -> str:

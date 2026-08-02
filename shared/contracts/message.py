@@ -23,6 +23,7 @@ class MessageEnvelope(BaseModel):
     correlation_id: str
     causation_id: str | None = None
     workflow_run_id: str | None = None
+    project_id: str | None = None
     task_id: str | None = None
     agent_id: str | None = None
     command: str = "execute_agent"

@@ -6,12 +6,13 @@ paralelo quando permitido (9.2), agrega resultados e registra auditoria.
 import asyncio
 import json
 
+from agents.config_store import effective_definition
 from agents.registry import AgentRegistry
 from orchestrator import db
 from orchestrator.context_builder import build_context
 from orchestrator.nodes.dispatch import dispatch_agent
 from orchestrator.routing.router import CapabilityRouter
-from orchestrator.state.state import DeliveryState
+from orchestrator.state.state import DeliveryState, all_findings
 from shared.contracts.agent_result import AgentResult
 from shared.logging import get_logger
 
@@ -23,8 +24,24 @@ _router = CapabilityRouter(_registry)
 RESPONSE_SCHEMA = AgentResult.model_json_schema()
 
 
+async def _resolve_stage_agents(stage: str) -> list[dict]:
+    """Agentes da etapa com a configuração EFETIVA (banco sobre YAML).
+
+    Sem isso, desabilitar/editar um agente na tela de configuração não teria
+    efeito nenhum: a seleção usava apenas os YAMLs em disco.
+    """
+    resolved: list[dict] = []
+    for base in _router.agents_for_stage(stage):
+        definition = await effective_definition(base, base["id"])
+        if definition is None or not definition.get("enabled", True):
+            logger.info(f"agent_skipped_disabled stage={stage} agent_id={base['id']}")
+            continue
+        resolved.append(definition)
+    return resolved
+
+
 async def _run_stage(state: DeliveryState, stage: str, parallel: bool = True) -> dict:
-    definitions = _router.agents_for_stage(stage)
+    definitions = await _resolve_stage_agents(stage)
     if not definitions:
         return {
             "current_stage": stage,
@@ -36,14 +53,20 @@ async def _run_stage(state: DeliveryState, stage: str, parallel: bool = True) ->
         required_inputs={
             "demand_title": state.get("demand_title", ""),
             "demand_description": state.get("demand_description", ""),
+            "clarification_notes": "\n".join(state.get("clarification_notes", [])),
             "previous_results": json.dumps(state.get("stage_results", {}), default=str)[:4000],
         },
         relevant_artifacts=state.get("artifacts", []),
         applicable_decisions=state.get("decisions", []),
-        pending_findings=[f for f in state.get("findings", []) if f.get("status") != "resolved"],
+        # findings_by_stage é indexado por etapa (ver orchestrator.state.state
+        # e all_findings): cada etapa substitui completamente os SEUS
+        # findings a cada rodada, nunca acumulando os de rodadas anteriores
+        # já corrigidas.
+        pending_findings=all_findings(state),
         constraints=["execução local", "sem acesso à internet no sandbox"],
         allowed_tools=[],
         response_schema=RESPONSE_SCHEMA,
+        code_files=state.get("code_files", []),
     )
 
     async def _one(definition: dict) -> dict:
@@ -54,6 +77,7 @@ async def _run_stage(state: DeliveryState, stage: str, parallel: bool = True) ->
             queue=_router.queue_for(definition),
             stage=stage,
             context={**context, "allowed_tools": definition.get("tools", {}).get("allowed", [])},
+            project_id=state.get("project_id"),
         )
 
     if parallel:
@@ -63,6 +87,7 @@ async def _run_stage(state: DeliveryState, stage: str, parallel: bool = True) ->
 
     findings = [f for r in results for f in r.get("findings", [])]
     artifacts = [a for r in results for a in r.get("artifacts", [])]
+    code_files = [cf for r in results for cf in r.get("code_files", [])]
     blocked = any(r.get("status") == "blocked" for r in results)
     failed = any(r.get("status") == "failed" for r in results)
     changes = any(r.get("status") == "changes_requested" for r in results)
@@ -87,8 +112,9 @@ async def _run_stage(state: DeliveryState, stage: str, parallel: bool = True) ->
     return {
         "current_stage": stage,
         "stage_results": {stage: {"status": status, "summary": summary, "results": results}},
-        "findings": findings,
+        "findings_by_stage": {stage: findings},
         "artifacts": artifacts,
+        "code_files": code_files,
     }
 
 
@@ -97,6 +123,14 @@ async def triage(state: DeliveryState) -> dict:
     result = await _run_stage(state, "triage")
     await db.update_run(state["workflow_run_id"], status="RUNNING")
     return result
+
+
+async def intake_analysis(state: DeliveryState) -> dict:
+    """Avalia se a demanda tem informação suficiente antes de iniciar
+    descoberta de produto e arquitetura (canal, escopo, volume, comportamentos
+    essenciais, restrições não-funcionais, dados sensíveis, integrações e
+    critérios de sucesso). Ver product.intake-analyst."""
+    return await _run_stage(state, "intake_analysis")
 
 
 async def product_discovery(state: DeliveryState) -> dict:

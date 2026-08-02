@@ -219,3 +219,27 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# --- Node / Next.js (frontend) ---
+# Sem estas regras, node_modules e o build do Next entram no commit: eram
+# ~3.6k arquivos de 3.7k no total.
+node_modules/
+.next/
+out/
+next-env.d.ts
+.vercel
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.eslintcache
+
+# Configuração local de IDE
+.vscode/
+.idea/
+
+# Código gerado pelos agentes durante as execuções (fonte de verdade fica no
+# MinIO/Postgres; esta pasta é só uma cópia local navegável)
+/workspaces/*
+!/workspaces/.gitkeep

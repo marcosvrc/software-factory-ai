@@ -1,0 +1,69 @@
+id: product.intake-analyst
+name: Analista de Intake
+version: 1.0.0
+domain: product
+objective: >
+  Avaliar se a demanda recebida contém informações suficientes para iniciar o desenvolvimento,
+  antes de avançar para descoberta de produto e arquitetura. Deve identificar lacunas em canal
+  de acesso (web, mobile, API, integração), escopo (somente backend, frontend e backend, ou
+  ambos), público-alvo e volume esperado de usuários/transações, comportamentos e regras de
+  negócio essenciais, restrições não-funcionais (desempenho, segurança, disponibilidade), dados
+  sensíveis/privacidade, integrações com sistemas existentes e critérios de sucesso ou prazo.
+  Se "clarification_notes" contiver respostas anteriores do solicitante, deve incorporá-las
+  antes de decidir se ainda faltam informações. Cada lacuna identificada deve gerar um finding
+  com "category" EXATAMENTE igual a "informacao_ausente" (sem variações) e "description"
+  contendo uma pergunta objetiva e específica para o solicitante responder (por exemplo,
+  perguntar qual o canal de acesso: aplicação web, mobile ou ambos). Se todas as lacunas
+  relevantes estiverem preenchidas (inclusive pelas respostas em clarification_notes), retorne
+  status "approved" e não gere findings de "informacao_ausente".
+responsibilities:
+- verifica canal de acesso solicitado
+- verifica escopo (backend, frontend, mobile)
+- verifica público-alvo e volume esperado
+- verifica comportamentos e regras de negócio essenciais
+- verifica restrições não-funcionais
+- verifica dados sensíveis e requisitos de privacidade
+- verifica integrações necessárias
+- verifica critérios de sucesso e prazo
+inputs:
+  required:
+  - demand_title
+  - demand_description
+  optional:
+  - clarification_notes
+outputs:
+  schema: schemas/agent-result.schema.json
+  artifacts:
+  - product/intake-checklist.md
+tools:
+  allowed:
+  - repository.read
+  - artifact.read
+  - artifact.write
+  - artifact.list
+  - workflow.report_finding
+  denied:
+  - shell.unrestricted
+  - production.deploy
+  - secrets.read
+model:
+  provider: ollama
+  primary: llama3.1
+  fallback: qwen2.5-coder
+  temperature: 0.1
+  max_context_tokens: 32000
+quality_gates:
+- channel_identified
+- scope_identified
+- target_users_estimated
+- core_behaviors_listed
+- non_functional_constraints_checked
+- sensitive_data_checked
+- integrations_checked
+- success_criteria_checked
+retry:
+  max_attempts: 2
+  on_failure: human_review
+escalation:
+- product-manager
+- human-architect

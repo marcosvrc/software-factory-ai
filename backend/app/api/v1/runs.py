@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import get_current_user, require_role
 from app.db.session import get_db
 from app.messaging.rabbitmq import publisher
-from app.models import AuditEvent, Demand, Task, User, WorkflowRun
+from app.models import AuditEvent, Demand, Project, Task, User, WorkflowRun
 from app.observability.metrics import WORKFLOWS_STARTED
 from app.schemas.api import RunOut, TaskOut, TimelineEntry
 from app.services.audit import record_audit
@@ -54,6 +54,34 @@ async def start_run(
     except Exception:  # noqa: BLE001 - orquestrador também faz polling do banco
         pass
     return run
+
+
+@router.get("/runs", response_model=list[RunOut])
+async def list_runs(
+    status: str | None = None,
+    project_id: str | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[RunOut]:
+    query = (
+        select(WorkflowRun, Demand.title, Project.name)
+        .join(Demand, Demand.id == WorkflowRun.demand_id)
+        .join(Project, Project.id == WorkflowRun.project_id)
+        .order_by(WorkflowRun.created_at.desc())
+        .limit(min(limit, 200))
+    )
+    if status:
+        query = query.where(WorkflowRun.status == status)
+    if project_id:
+        query = query.where(WorkflowRun.project_id == project_id)
+    rows = (await db.execute(query)).all()
+    return [
+        RunOut.model_validate(run).model_copy(
+            update={"demand_title": demand_title, "project_name": project_name}
+        )
+        for run, demand_title, project_name in rows
+    ]
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)

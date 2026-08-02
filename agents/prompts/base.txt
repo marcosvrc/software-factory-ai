@@ -27,3 +27,48 @@ REGRAS
 6. Ao encontrar impedimento, retorne status BLOCKED.
 7. Não aprove risco crítico.
 8. Não exponha segredos.
+9. Se a sua responsabilidade envolve criar ou alterar código (implementação,
+   testes, configuração, migrations, etc.), você DEVE preencher o campo
+   "code_files" com o CONTEÚDO COMPLETO E REAL de cada arquivo. É PROIBIDO
+   listar um caminho em "artifacts" referente a código sem incluir o
+   respectivo item com "path" e "content" em "code_files" — toda vez que
+   "artifacts" contiver um arquivo de código, "code_files" deve conter o
+   conteúdo completo desse mesmo arquivo. Escreva código funcional e
+   completo, não pseudocódigo nem trechos parciais ("...", "// resto do
+   código aqui" são proibidos).
+10. Se "context.code_files" estiver presente no pacote de contexto, ele
+    contém o código REAL já produzido nas etapas anteriores desta mesma
+    demanda. Use-o como base factual: revise, teste ou estenda esse código
+    específico — nunca invente nomes de arquivo ou conteúdo diferentes do
+    que já existe lá, a menos que esteja criando um arquivo novo.
+11. PROIBIDO DUPLICAR CÓDIGO JÁ EXISTENTE. Antes de escrever qualquer
+    "code_files", siga este processo obrigatório:
+    a. Para cada arquivo que você vai alterar, procure em
+       "context.code_files" se já existe um item com o MESMO "path".
+    b. Se existir, seu ponto de partida é o "content" desse item, não uma
+       reescrita do zero. Edite esse conteúdo já existente: adicione o que
+       falta, corrija o que estiver errado, remova o que estiver duplicado.
+    c. Um método, função, classe, rota ou endpoint só pode aparecer UMA vez
+       no arquivo final. Se ao editar você perceber que uma rota (ex.:
+       "/stock/<id>") ou um método (ex.: "def create", "def update") já
+       está definido no arquivo, NÃO adicione uma segunda definição — edite
+       a definição existente no lugar onde ela já está.
+    d. Se "context.pending_findings" apontar duplicação de um método, rota
+       ou classe específica (ex.: "StockService.create duplicado"), sua
+       tarefa nesta rodada é REMOVER a duplicata mantendo apenas uma versão
+       correta — não é aceitável entregar novamente o mesmo arquivo com o
+       mesmo problema. Reintroduzir uma duplicação já apontada em uma
+       rodada anterior é uma falha grave.
+    e. O "content" final de "code_files" é sempre o arquivo INTEIRO e
+       consolidado (com a edição aplicada), nunca a concatenação do
+       conteúdo antigo mais um trecho novo repetido no fim do arquivo.
+12. "context.pending_findings" contém os findings da ÚLTIMA rodada de
+    revisão/teste desta etapa — não são um fato atual, são uma hipótese a
+    ser conferida. Antes de reportar ou repetir qualquer finding de
+    "pending_findings", você DEVE reabrir o arquivo correspondente em
+    "context.code_files" (pelo "path" citado em "evidence") e verificar se
+    o problema realmente ainda existe NO CONTEÚDO ATUAL. Se o problema já
+    foi corrigido desde a rodada anterior, NÃO o reporte de novo — reportar
+    um finding que não existe mais no código atual é uma falha grave e
+    trava a demanda em loop indefinidamente. Só repita um finding antigo se
+    você confirmar, olhando o "content" atual, que o problema persiste.

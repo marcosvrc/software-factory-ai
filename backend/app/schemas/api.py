@@ -66,6 +66,8 @@ class RunOut(ORMModel):
     finished_at: datetime | None
     correlation_id: str
     created_at: datetime
+    demand_title: str | None = None
+    project_name: str | None = None
 
 
 class TaskOut(ORMModel):
@@ -131,15 +133,102 @@ class AgentOut(ORMModel):
     domain: str
     configuration: dict
     enabled: bool
+    stages: list = Field(default_factory=list)
+    # True quando a configuração efetiva difere do padrão do YAML (permite a
+    # UI sinalizar "customizado" e oferecer "restaurar padrão").
+    customized: bool = False
 
 
 class AgentUpdate(BaseModel):
+    """Atualização parcial da configuração do agente.
+
+    `configuration` substitui a configuração efetiva por inteiro (a tela envia
+    o objeto completo já editado). Os demais campos são atalhos para editar
+    apenas uma parte, aplicados sobre a configuração atual.
+    """
+
     enabled: bool | None = None
     configuration: dict | None = None
+    prompt_template: str | None = None
+    objective: str | None = None
+    responsibilities: list[str] | None = None
+    model: dict | None = None
+    tools: dict | None = None
+    quality_gates: list[str] | None = None
+    # Nomes de servidores MCP que este agente pode usar (fase 2 do MCP).
+    mcp_servers: list[str] | None = None
 
 
 class AgentTestRequest(BaseModel):
     input: dict = Field(default_factory=dict)
+
+
+# --- Servidores MCP ---
+class McpServerCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+    transport: str = Field(default="stdio", pattern="^(stdio|http)$")
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+    timeout_seconds: int = Field(default=30, ge=1, le=300)
+    enabled: bool = False
+
+
+class McpServerUpdate(BaseModel):
+    description: str | None = None
+    transport: str | None = Field(default=None, pattern="^(stdio|http)$")
+    command: str | None = None
+    args: list[str] | None = None
+    # Ausente = mantém os valores atuais; enviado = substitui por completo.
+    env: dict[str, str] | None = None
+    headers: dict[str, str] | None = None
+    url: str | None = None
+    timeout_seconds: int | None = Field(default=None, ge=1, le=300)
+    enabled: bool | None = None
+
+
+class McpToolOut(BaseModel):
+    name: str
+    description: str = ""
+    input_schema: dict = Field(default_factory=dict)
+
+
+class McpServerOut(ORMModel):
+    id: str
+    name: str
+    description: str | None
+    transport: str
+    command: str | None
+    args: list
+    url: str | None
+    timeout_seconds: int
+    enabled: bool
+    tools: list
+    last_status: str | None
+    last_error: str | None
+    last_checked_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    # Chaves de env/headers são expostas (úteis para conferência), mas os
+    # valores nunca — podem conter tokens de acesso.
+    env_keys: list[str] = Field(default_factory=list)
+    header_keys: list[str] = Field(default_factory=list)
+    # Agentes que declararam usar este servidor.
+    used_by_agents: list[str] = Field(default_factory=list)
+    # Estado da autorização OAuth (tokens nunca são expostos):
+    # not_applicable | not_authorized | authorized | expired
+    auth_status: str = "not_applicable"
+    oauth_expires_at: datetime | None = None
+    oauth_scope: str | None = None
+    has_oauth_client: bool = False
+
+
+class McpOAuthStartOut(BaseModel):
+    authorization_url: str
+    redirect_uri: str
 
 
 # --- Auth ---

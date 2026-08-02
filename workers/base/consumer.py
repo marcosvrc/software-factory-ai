@@ -14,12 +14,17 @@ import os
 import aio_pika
 import redis.asyncio as aioredis
 
+from agents.config_store import effective_definition
 from agents.registry import AgentRegistry
 from agents.runtime.executor import AgentExecutor
 from shared.contracts.message import MessageEnvelope
 from shared.logging import configure_logging, get_logger
 from workers.base import persistence
-from workers.base.artifacts import store_result_artifact
+from workers.base.artifacts import (
+    store_code_file,
+    store_result_artifact,
+    write_code_file_to_workspace,
+)
 
 logger = get_logger("workers.consumer")
 
@@ -120,10 +125,73 @@ class DomainWorker:
                 routing_key=self.queue_name,
             )
 
+    async def _store_code_files(
+        self, envelope: MessageEnvelope, task_id: str, agent_id: str, result_payload: dict
+    ) -> None:
+        """Persiste o conteúdo real de cada code_file retornado pelo agente:
+        objeto no MinIO + registro na tabela `artifacts` (visível na API e
+        no frontend). Sem project_id não é possível registrar o artefato
+        (coluna NOT NULL), então nesse caso apenas o objeto é gravado no
+        MinIO e o registro estruturado é pulado."""
+        code_files = result_payload.get("code_files", [])
+        if not code_files:
+            return
+        workflow_run_id = envelope.workflow_run_id or ""
+        for code_file in code_files:
+            path = code_file.get("path")
+            content = code_file.get("content")
+            if not path or content is None:
+                continue
+            stored = await store_code_file(
+                workflow_run_id=workflow_run_id, task_id=task_id, path=path, content=content
+            )
+            if stored is None:
+                logger.warning(f"code_file_store_failed path={path} task_id={task_id}")
+                continue
+            reference, checksum = stored
+
+            # Materializa o arquivo em disco no workspace do projeto (além da
+            # cópia versionada no MinIO), para permitir abrir o código gerado
+            # num editor normal. Falha aqui não impede o restante do fluxo.
+            if envelope.project_id:
+                try:
+                    written_path = write_code_file_to_workspace(
+                        project_id=envelope.project_id, path=path, content=content
+                    )
+                    if written_path is None:
+                        logger.warning(f"workspace_write_skipped path={path}")
+                except Exception:  # noqa: BLE001
+                    logger.exception(f"workspace_write_error path={path}")
+            if envelope.project_id is None:
+                logger.warning(
+                    f"code_file_artifact_skipped_no_project path={path} task_id={task_id}"
+                )
+                continue
+            # storage_key é a chave DENTRO do bucket (sem o prefixo
+            # "minio://<bucket>/"), no mesmo formato usado por
+            # backend/app/api/v1/artifacts.py ao ler o objeto de volta.
+            storage_key = reference.split("/", 3)[-1]
+            try:
+                await persistence.record_artifact(
+                    project_id=envelope.project_id,
+                    workflow_run_id=workflow_run_id,
+                    task_id=task_id,
+                    type_="code",
+                    name=path,
+                    storage_key=storage_key,
+                    checksum=checksum,
+                    created_by=agent_id,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(f"code_file_artifact_record_failed path={path}")
+
     async def _execute(self, envelope: MessageEnvelope) -> None:
         task_id = envelope.task_id or ""
         agent_id = envelope.agent_id or ""
-        definition = self.registry.get(agent_id)
+        # Configuração EFETIVA (banco sobre YAML): permite que edições feitas
+        # na tela de configuração de agentes (prompt, modelo, ferramentas) e o
+        # toggle de habilitado valham de fato na execução.
+        definition = await effective_definition(self.registry.get(agent_id), agent_id)
         await persistence.update_task_status(task_id, "IN_PROGRESS", increment_attempt=True)
         await persistence.record_audit_event(
             event_type="agent.execution.started",
@@ -154,6 +222,7 @@ class DomainWorker:
             agent_id=agent_id,
             payload=result_payload,
         )
+        await self._store_code_files(envelope, task_id, agent_id, result_payload)
         execution_id = await persistence.record_agent_execution(
             task_id=task_id,
             agent_id=agent_id,
